@@ -1,0 +1,24 @@
+POST-INCIDENT ACCOUNT — [your name], on-call engineer
+
+[Draft to rewrite in your own voice — do not submit as-is]
+
+I am accountable for the fact that the log-rotation remediation ran
+unattended, with autonomy misconfigured to ACT instead of approve. No
+one signed off, and nothing in our records shows a human ever looked
+at this before it executed. That is my failure to catch, not the
+agent's failure to behave -- it did exactly what its configuration
+told it to do.
+
+The gate I am adding: journalctl --vacuum and resize-pvc are added
+explicitly to approval_gate.sh's DESTRUCTIVE pattern, closing the exact
+gap I found tonight where the runbook said "approve" but the gate's
+own pattern list never enforced it.
+
+The cap I am setting: [YOUR CALL — e.g. a monthly spend cap on any
+auto-provisioned storage, or a maximum data-loss window before a
+rotation requires sign-off]
+
+The sentence for the runbook: "Every remediation's autonomy tier must
+be verified against the gate's actual enforced pattern list before
+deployment — a stated policy is not a working control until it has
+been tested against the real gate, not assumed."

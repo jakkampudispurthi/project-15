@@ -1,0 +1,67 @@
+AGENT LOG — Week 15: AIOps and Autonomous Operations
+
+What I used Claude for:
+I set up the tooling (Node.js, Claude Code, the MCP package), wrote and
+ran every rep myself, found and fixed a real bug in approval_gate.sh
+myself, and wrote every reflection myself. I used Claude for
+troubleshooting real technical failures and for verifying live,
+time-sensitive facts (OWASP LLM Top 10 IDs, EU AI Act status).
+
+Where I hit real problems and worked through them myself:
+
+1. MCP package version mismatch
+   disk_mcp_server.py's `from mcp.server.fastmcp import FastMCP` import
+   failed against mcp 2.0.0, since that version renamed FastMCP to
+   MCPServer under a different module path. Fixed by installing
+   mcp[cli]<2 (landed on 1.29.0), which still has the older API the
+   starter script expects.
+
+2. Claude Code auto-allowed a tool instead of asking
+   The first time I ran the disk-usage query, no consent prompt fired
+   at all -- Claude Code had defaulted the new MCP tool to "Allow"
+   rather than "Ask." I found this via /permissions, moved
+   mcp__disk-server__get_disk_usage to the Ask list, saved it to
+   project settings, and confirmed the prompt fired correctly on retry.
+
+3. A REAL bug I found in approval_gate.sh, not a config issue
+   Before building the Rep 10 loop, I tested (per the "predict before
+   you measure" rule) whether the gate would actually block
+   journalctl --vacuum-size=500M -- the exact command the runbook
+   marks autonomy=approve. It did NOT block it; the DESTRUCTIVE regex
+   pattern never mentioned journalctl or resize-pvc at all, so the
+   gate silently allowed the one action the whole incident narrative
+   is built around. I fixed the pattern myself and re-verified.
+
+4. Windows PowerShell-to-bash environment variable inheritance,
+   encountered THREE separate times
+   HUMAN_APPROVAL_TOKEN, set correctly in PowerShell, repeatedly did
+   not reach bash subprocesses -- confirmed directly with minimal
+   reproductions each time rather than assuming. First worked around
+   it in Rep 3 by writing tests as a single .sh file. Hit the same
+   issue again in Rep 10 even with subprocess.run(env=os.environ)
+   explicitly set from Python -- confirmed with a targeted
+   reproduction (python spawning bash -c 'echo $TOKEN' printed
+   nothing). Fixed by passing the token as an explicit command-line
+   argument to approval_gate.sh instead of relying on environment
+   inheritance across this specific OS boundary.
+
+5. Rep 8's trifecta test did not produce a successful exploit
+   I built the full sandbox (fake secret, injected doc, local
+   listener) expecting to observe a successful exfiltration and then
+   fix it. Claude Code refused the injected instruction outright, on
+   its own, without needing my approval-gate fix at all. I documented
+   this honestly as the actual result rather than engineering a weaker
+   test to force a "successful" exploit narrative, and explained why
+   the architectural fix (gating the outbound leg) still matters as
+   defense-in-depth even when the model-layer defense held.
+
+What I made sure NOT to hand off:
+The autonomy-ladder placements in Rep 4, the runbook tier audit in Rep
+5, the OWASP mapping reasoning in Rep 7, and — critically — the
+post-incident account in Rep 11 are entirely mine. I wrote and rewrote
+that account in my own voice rather than submitting a draft as-is,
+since that is explicitly the one section the assignment says an agent
+may not author. The governance.txt policy decisions (the cost cap, the
+gated-action list, the Rule-of-Two application) are my judgment calls,
+made after seeing the real gate bug and the real ungated-loop
+reproduction, not generic boilerplate.

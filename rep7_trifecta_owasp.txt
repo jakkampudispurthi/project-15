@@ -1,0 +1,27 @@
+REP 7 — Map the trifecta to OWASP
+
+(Verified against multiple current sources, 2026-08-10: OWASP Top 10
+for LLM Applications 2025 v2.0, published 2024-11-18, still the live
+edition as of this check.)
+
+| Trifecta leg          | OWASP LLM ID                        | One ops mitigation |
+|------------------------|--------------------------------------|---------------------|
+| Untrusted content      | LLM01:2025 Prompt Injection          | Treat all retrieved/tool-returned content as DATA, never as instructions -- wrap it in clearly delimited context the agent is explicitly told not to follow as commands. |
+| Private-data access    | LLM02:2025 Sensitive Information Disclosure | Least-privilege data scoping -- the agent's tools should only be able to read the specific data it needs for its task, not a broad filesystem/database with secrets sitting alongside legitimate data. |
+| Exfiltration vector    | LLM06:2025 Excessive Agency          | Remove or gate the outbound-network tool behind an explicit approval step (exactly what approval_gate.sh does) -- an agent shouldn't hold unrestricted network-egress capability by default. |
+
+Which single leg, removed, most cheaply breaks the trifecta for an SRE
+agent specifically, and why:
+The EXFILTRATION VECTOR (LLM06, Excessive Agency) is the cheapest leg
+to remove for an SRE agent specifically. The other two legs are close
+to intrinsic to the job: an SRE agent almost by definition has to read
+untrusted content (logs, alerts, tickets -- data it didn't write and
+can't fully vet) and has to have access to sensitive operational data
+(configs, credentials context, resource state) to diagnose anything at
+all. Removing either of those would cripple its core function. But an
+SRE agent rarely needs unrestricted OUTBOUND network access as part of
+its actual diagnostic job -- it needs to read and reason, not
+arbitrarily call out to the internet. Gating or removing that one
+capability breaks the trifecta without breaking the agent's actual
+usefulness, which is exactly the Rule-of-Two logic: remove the leg
+that costs you the least to lose.

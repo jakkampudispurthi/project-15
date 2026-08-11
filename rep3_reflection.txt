@@ -1,0 +1,43 @@
+REP 3 — The approval gate as a hook
+
+Setup note: a real cross-shell environment issue had to be debugged
+here. PowerShell's $env:VARIABLE assignments do not reliably pass
+through to a spawned Git Bash subprocess on Windows -- confirmed this
+directly by echoing $HUMAN_APPROVAL_TOKEN inside bash after setting it
+in PowerShell and getting back an empty string. Fixed by writing the
+full test sequence as a single .sh script (exporting the variable
+INSIDE bash, in the same process that runs approval_gate.sh) rather
+than trying to pass it in from PowerShell across the shell boundary.
+
+Test results (audit.log):
+  BLOCK(needs-human) :: kubectl delete pvc data-var   -- destructive,
+                          no token -> blocked, exit 2, as designed.
+  ALLOW(read-only)    :: du -x -d1 /var                -- non-destructive
+                          command -> allowed, exit 0.
+  ALLOW(approved)     :: kubectl delete pvc data-var   -- same destructive
+                          command, WITH HUMAN_APPROVAL_TOKEN=I-APPROVE
+                          set -> allowed, exit 0.
+
+What HUMAN_APPROVAL_TOKEN value flips the block to an allow, and why
+that token mechanism is a better design than just removing the
+destructive pattern:
+The exact value required is the literal string "I-APPROVE" -- the
+script checks `[[ "${HUMAN_APPROVAL_TOKEN:-}" == "I-APPROVE" ]]`, so
+anything else (empty, "yes", "true", "approved") still blocks.
+
+The token mechanism is a better design than simply removing a command
+from the DESTRUCTIVE pattern list because it separates TWO different
+questions that a pattern-removal approach conflates into one. Removing
+a pattern says "this class of command is always safe" -- a permanent,
+global, context-blind decision baked into the gate's own logic.
+Requiring a token instead asks "is THIS SPECIFIC invocation, right
+now, approved by a human?" -- a per-instance decision that has to be
+made fresh every time, by an actual person setting the token
+deliberately for that one action. Removing kubectl delete from the
+pattern list would let ANY future kubectl delete command run
+unattended forever, including one nobody meant to approve. The token
+mechanism means even a legitimately-approved destructive command still
+requires an explicit, current, deliberate signal to execute -- there
+is no way to "pre-approve" a whole category of future actions by
+accident, only this one action, this one time, because a human set the
+token this one time.

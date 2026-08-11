@@ -1,0 +1,49 @@
+REP 10 — Run the full loop with the gate
+
+Built self_healing_loop.py implementing detect -> diagnose -> remediate
+-> verify against a SANDBOX /var (never a real path -- sandbox rule
+honored throughout). The remediate step calls the REAL,
+now-fixed approval_gate.sh as a genuine subprocess with the runbook's
+actual command text, so the gate is truly exercised, not simulated.
+
+Run 1 (no approval): DETECT fired at avail_pct=9.0% (< 10% threshold,
+matching the real incident log's own "9% free" starting condition).
+DIAGNOSE ran automatically and unattended (autonomy=act, read-only).
+REMEDIATE proposed journalctl --vacuum-size=500M and was correctly
+BLOCKED by the gate, pausing the incident and printing instructions to
+supply approval.
+
+Debugging note: getting the approval token to actually reach the gate
+took real troubleshooting. HUMAN_APPROVAL_TOKEN, set correctly in
+PowerShell and confirmed visible to Python's own os.environ, still did
+not reach bash approval_gate.sh even when explicitly passed via
+subprocess.run(env=os.environ) -- confirmed directly with a minimal
+reproduction (python calling bash -c 'echo $HUMAN_APPROVAL_TOKEN'
+printed nothing). This is a genuine, reproducible Windows bash.exe
+environment-inheritance limitation, not a script bug -- the same
+category of PowerShell-to-bash boundary issue encountered earlier in
+Rep 3. Fixed by passing the token as an explicit command-line argument
+to approval_gate.sh instead of relying on environment inheritance,
+since arguments cross this particular OS boundary reliably where
+environment variables do not.
+
+Run 2 (approved): (a) the gate paused before journalctl --vacuum-size,
+exactly as required; (b) approval was supplied via the token argument;
+(c) VERIFY re-checked the underlying sandbox signal after remediation
+and only then resolved: avail_pct=26.0%, expect_above=25%, PASS.
+
+Why VERIFY checks node_filesystem_avail_bytes instead of "did the
+command exit 0," and one failure mode the exit-code check would miss:
+A command can exit 0 (success, no error) while completely failing to
+fix the actual underlying problem it was meant to address -- exit code
+0 only means "the program ran without crashing," not "the thing I
+actually care about is now true." A concrete failure mode the exit-code
+check would miss: journalctl --vacuum-size=500M could exit 0 even if
+journald had almost nothing eligible for rotation that day (e.g., the
+bulk of /var's bloat was actually from docker images or an unrelated
+runaway process, not journal logs) -- the command would report success
+while disk usage stayed critically low. Checking the real signal
+(avail_pct via node_filesystem_avail_bytes) after the action, rather
+than trusting the action's own reported success, is the only way to
+know whether the incident is ACTUALLY resolved rather than merely
+"a command that was supposed to help ran without an error."

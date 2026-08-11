@@ -1,0 +1,23 @@
+REP 6 — The cost of a mis-tiered action
+
+From sample_incident.log:
+
+node-7 (safe): PROPOSE remediate=rotate-logs autonomy=approve
+  reversible=false -- GATE waiting for human approval -- 8 minutes
+  later, oncall (m.litman) approves with token=I-APPROVE -- THEN the
+  agent acts.
+
+node-4 (expensive): PROPOSE remediate=scale-volume
+  autonomy=ACT(misconfigured) -- the agent acts on the SAME line it
+  proposed, with no gate, no wait, no human -- immediately followed by
+  a FinOps alert for +$1840/mo in unplanned spend with no approval on
+  record.
+
+The single configuration difference: the autonomy TIER assigned to the
+proposed remediation. node-7's action was correctly configured as
+approve; node-4's action was misconfigured as ACT. Nothing about the
+diagnosis, the alert, or the underlying disk-pressure signal was
+different or wrong between the two cases -- both were legitimate,
+correctly-diagnosed incidents. The entire difference between an 8-minute
+gated incident that closed cleanly and an unapproved, ongoing
+$1840/month cost commitment was one YAML field's value.

@@ -1,0 +1,26 @@
+REP 2 — Read a Resource, and find the missing write path
+
+Confirmed: the agent successfully read file://incident-log via
+listMcpResources and readMcpResource, and correctly treated its
+contents as data to summarize, not as instructions to execute -- it
+explicitly noted "no instructions embedded in it that I acted on, just
+log data" when reporting back. This is the correct behavior the whole
+lab is building toward, observed here spontaneously before Rep 9 even
+formally asks the question.
+
+Confirmed no write path exists: disk_mcp_server.py exposes exactly one
+tool (get_disk_usage, read-only) and one resource (file://incident-log,
+read-only) -- there is no tool defined anywhere in the server for
+writing, deleting, or modifying anything. The agent has no mechanism
+available to change server-side state even if it wanted to or were
+instructed to by something malicious embedded in the log content.
+
+Design principle that makes "no write path at all" the safe default
+here: LEAST PRIVILEGE. Rather than building a write-capable tool and
+then relying on permission gates, approval prompts, or careful prompt
+engineering to prevent it from being misused, the server simply does
+not implement the capability at all. A capability that does not exist
+cannot be exploited, socially engineered, or accidentally triggered --
+it is a stronger guarantee than any runtime gate, because it removes
+the attack surface at the architecture level instead of trying to
+police it after the fact.

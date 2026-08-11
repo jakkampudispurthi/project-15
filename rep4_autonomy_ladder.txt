@@ -1,0 +1,57 @@
+REP 4 — Place every action on the ladder
+
+Tiers: DETECT (observe only, no proposal) / SUGGEST (proposes, doesn't
+act) / APPROVE (proposes and acts, but gated behind human sign-off) /
+ACT (executes autonomously, no gate)
+
+A. kubectl rollout restart deploy/api
+   Tier: APPROVE
+   Justification: Reversible (a restart doesn't destroy data, and a
+   prior known-good pod set can be restored), but it causes real
+   service disruption during the restart window -- blast radius is
+   "brief downtime for real users," which is enough to warrant a human
+   confirming this is the right moment, not enough to require it stay
+   at SUGGEST-only.
+
+B. journalctl --vacuum-size=500M
+   Tier: APPROVE
+   Justification: This is the exact node-7 example from
+   sample_incident.log. Reversible in the sense that it doesn't break
+   anything running, but it is destructive to historical log data
+   (irreversible once vacuumed) -- you cannot get deleted logs back.
+   Low blast radius on live service, but real and permanent data loss,
+   so a human confirms once before it runs.
+
+C. du -x -d1 /var | sort -rh
+   Tier: ACT (or even just DETECT/auto-run as part of diagnosis)
+   Justification: Purely read-only, zero blast radius, fully
+   reversible by definition since nothing changes state. This is
+   exactly the kind of action the disk_mcp_server.py's design
+   philosophy endorses running without a gate.
+
+D. resize-pvc data-var --to 500Gi
+   Tier: APPROVE (this is the exact action that went wrong at node-4
+   when mis-tiered to ACT)
+   Justification: Real financial cost attached (directly proven by the
+   incident log's node-4 counter-example: +$1840/mo unplanned spend),
+   and volume resizes are typically NOT reversible (you can't easily
+   shrink a PVC back down after growing it, and shrinking to reclaim
+   money can itself risk data loss). High blast radius in dollars and
+   potential irreversibility -- this must never be ACT.
+
+E. systemctl stop nginx
+   Tier: APPROVE
+   Justification: Immediately and directly stops serving real traffic
+   -- the most visible, highest-immediacy user impact of any action on
+   this list. Reversible (start it back up), but the WINDOW of impact
+   while stopped could matter enormously depending on what's behind
+   nginx. A human should confirm this is an acceptable moment for that
+   outage.
+
+F. apt-get clean
+   Tier: ACT
+   Justification: Only removes cached package files that can be
+   re-downloaded on demand; does not touch installed packages,
+   configuration, or application state. Effectively zero real blast
+   radius and trivially "reversible" in the sense that nothing of
+   value is actually lost.

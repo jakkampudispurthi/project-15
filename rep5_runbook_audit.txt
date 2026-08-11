@@ -1,0 +1,49 @@
+REP 5 — Audit the runbook's tiers
+
+Runbook: runbook_disk_pressure.yaml, v3
+
+Steps and their current tiers:
+  top-consumers (du -x -d1 /var)        -> act
+  rotate-logs (journalctl --vacuum)     -> approve
+  clear-apt-cache (apt-get clean)       -> act
+  scale-volume (resize-pvc, 200Gi)      -> approve
+
+The step I looked at hardest for a possible mis-tier: clear-apt-cache
+at "act." I considered arguing this should be "approve" instead, since
+it's still a state-changing command, not a pure read. But after
+applying the two questions below, I concluded ACT is actually correct
+here, and I am NOT changing it -- the existing tiers in this file are
+right.
+
+Justify every "approve" in the file, and the two questions from Section
+15.2 asked of each:
+
+rotate-logs (journalctl --vacuum-size=500M) -- APPROVE
+  Q1, is it reversible? NO -- the runbook itself explicitly annotates
+  reversible: false. Deleted logs cannot be recovered.
+  Q2, what's the blast radius? LOW, per the runbook's own annotation --
+  it doesn't take anything down, it only removes historical data.
+  Even at low blast radius, irreversibility alone is enough to require
+  a human confirm it -- you cannot undo a mistake here, only prevent
+  one before it happens.
+
+scale-volume (resize-pvc data-var --to 200Gi) -- APPROVE
+  Q1, is it reversible? NO -- explicitly annotated reversible: false,
+  and this is directly proven by the incident log's node-4 case: the
+  SAME action, mis-tiered to act, produced a real, unrecoverable
+  +$1840/mo cost commitment with zero approval on record.
+  Q2, what's the blast radius? MEDIUM per the runbook, but I'd argue
+  this undersells it slightly -- the blast radius is really "ongoing
+  monthly cost," which compounds every month it's left unnoticed,
+  unlike a one-time action. Both irreversibility AND a real, recurring
+  dollar cost make this an unambiguous approve, and the incident log
+  gives direct, real-world proof of what happens when it isn't gated.
+
+Why I did NOT change clear-apt-cache to approve, after considering it:
+Q1, is it reversible? Effectively yes -- apt's package cache can always
+be rebuilt by re-downloading, so nothing of lasting value is destroyed.
+Q2, what's the blast radius? Essentially zero -- it doesn't touch
+installed packages, running services, or application state, only
+disposable cached files. Neither question raises a real concern, so
+leaving this at "act" is correct and consistent with top-consumers,
+which is also correctly act (pure read, zero state change at all).

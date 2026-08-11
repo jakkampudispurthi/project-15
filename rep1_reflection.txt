@@ -1,0 +1,37 @@
+REP 1 — The read-only MCP server and the consent prompt
+
+Setup note: the starter code was written against an older MCP Python
+SDK API (mcp 2.0.0's FastMCP moved/renamed to MCPServer). Installed
+mcp[cli]<2 (landed on 1.29.0) to match the starter script's expected
+`from mcp.server.fastmcp import FastMCP` import. Server then connected
+cleanly (confirmed via `claude mcp list` showing disk-server: Connected).
+
+Observation: the FIRST time I asked "what's disk usage on / ?", the
+tool ran with NO consent prompt at all -- Claude Code had auto-added
+get_disk_usage to its "Allow" list on first use rather than defaulting
+to "Ask." I found this via /permissions, moved the specific rule
+(mcp__disk-server__get_disk_usage) from Allow to Ask, saved it to
+project-level settings (.claude/settings.local.json), and re-ran the
+same question. The second time, the consent prompt fired correctly
+before the tool executed, and I approved it.
+
+Which MCP spec rule produced that prompt, and why does the spec also
+treat an untrusted server's tool descriptions as untrusted input:
+The prompt exists because the MCP specification requires host
+applications to obtain explicit user consent before invoking a tool
+exposed by a server -- tool execution is defined as a capability that
+can have side effects or expose data, so a host cannot silently grant
+an agent the ability to call it without the human in the loop
+approving that specific capability. The same spec treats the tool's
+own DESCRIPTION text as untrusted input, not just its execution, for a
+related but distinct reason: the description is text supplied by
+whoever wrote the server, and if the calling agent reads and reasons
+over that description as though it were trusted instruction, a
+malicious or compromised server could embed hidden instructions inside
+a tool's description field itself -- an indirect prompt injection
+delivered through metadata the user never sees rendered as "content,"
+only as a tool's stated purpose. Consent-gating the ACTION and
+distrusting the DESCRIPTION are two separate defenses for two separate
+attack surfaces: one guards against an unwanted action happening, the
+other guards against the agent being manipulated into wanting that
+action in the first place.

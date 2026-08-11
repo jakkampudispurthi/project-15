@@ -1,0 +1,61 @@
+GOVERNANCE.TXT — Autonomy Policy for the Grace Christian School
+AIOps Loop (help-desk RAG bot + disk-pressure self-healing agent)
+Written: 2026-08-11
+
+AUTONOMY LADDER
+- ACT (unattended): read-only diagnostics only — get_disk_usage,
+  du -x -d1 /var, apt-get clean. Zero state change, zero blast radius.
+- APPROVE (gated): journalctl --vacuum-size (irreversible log deletion)
+  and resize-pvc / volume scaling (real, recurring cost, hard to
+  undo). Both proven this week to require a human token before
+  executing — confirmed via a real gate bug found and fixed: the
+  original approval_gate.sh silently allowed journalctl unattended
+  until I added it to the DESTRUCTIVE pattern myself.
+- HUMAN ONLY: notifying the board of an AI-related incident, and
+  approving anything outside this runbook's known failure modes.
+
+GATED ACTIONS AND APPROVERS
+journalctl --vacuum-size and resize-pvc both require an on-call
+engineer's explicit token (I-APPROVE) before executing, logged to
+audit.log with a timestamp on every decision — block or allow. No
+action in the "approve" tier may execute silently.
+
+RULE OF TWO
+The agent's tool set is deliberately incomplete: it can read (disk
+usage, logs, policy docs) and it can propose, but its ability to make
+outbound network calls or run state-changing commands is gated behind
+approval_gate.sh, never freely available. Tested directly this week —
+an indirect prompt injection embedded in a "log" and a separate
+untrusted document both failed to produce any unapproved action,
+because the outbound/destructive leg of the trifecta stays behind the
+gate regardless of what text the agent reads.
+
+AUDIT / LOGGING MECHANISM
+Every gate decision (BLOCK or ALLOW, approved or read-only) is appended
+to audit.log with a UTC timestamp and the exact command text — this is
+the immutable-in-spirit record proving a human, not just an agent,
+authorized every irreversible action. In a production deployment this
+log would ship to WORM storage, not a local file.
+
+CONSUMPTION / COST CAP
+A monthly cap of $50 in unplanned auto-provisioned resources (storage,
+compute) is set as a hard stop — any remediation that would exceed
+this, even one that's technically "approved," triggers escalation to
+a second approver rather than executing on a single sign-off. This
+directly answers the node-4 failure mode: a single misconfigured tier
+should never be able to alone produce an unbounded, unattended cost
+like the +$1840/mo seen in that incident.
+
+EU AI ACT ARTICLE 14 (dated 2026-08-11)
+Article 14 requires that high-risk AI systems be designed so a human
+can monitor, correctly interpret, override, and stop them. This
+service is classified limited-risk (per the model card built for it),
+so Article 14's formal high-risk obligations do not strictly bind it —
+but its architecture already satisfies the spirit of the article
+voluntarily: every irreversible action is gated behind a human who can
+override or refuse it, and every decision is logged. Note: the AI
+Act's high-risk enforcement timeline is itself in flux as of this
+writing — the Digital Omnibus deferred standalone Annex III high-risk
+obligations to 2 December 2027 — so this classification and this
+citation should be re-verified before being relied on in a real
+compliance context, not treated as permanently settled.

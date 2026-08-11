@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "ask": [
+      "mcp__disk-server__get_disk_usage"
+    ]
+  }
+}

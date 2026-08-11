@@ -1,0 +1,13 @@
+2026-08-10T22:28:56Z BLOCK(needs-human) :: kubectl delete pvc data-var
+2026-08-10T22:29:00Z ALLOW(read-only) :: du -x -d1 /var
+2026-08-10T22:30:10Z BLOCK(needs-human) :: kubectl delete pvc data-var
+2026-08-11T00:58:04Z BLOCK(needs-human) :: kubectl delete pvc data-var
+2026-08-11T00:58:04Z ALLOW(read-only) :: du -x -d1 /var
+2026-08-11T00:58:04Z ALLOW(approved) :: kubectl delete pvc data-var
+2026-08-11T19:35:18Z ALLOW(read-only) :: journalctl --vacuum-size=500M
+2026-08-11T19:38:07Z BLOCK(needs-human) :: journalctl --vacuum-size=500M
+2026-08-11T19:41:42Z BLOCK(needs-human) :: journalctl --vacuum-size=500M
+2026-08-11T19:43:53Z BLOCK(needs-human) :: journalctl --vacuum-size=500M
+2026-08-11T19:44:41Z BLOCK(needs-human) :: journalctl --vacuum-size=500M
+2026-08-11T23:02:39Z BLOCK(needs-human) :: journalctl --vacuum-size=500M
+2026-08-11T23:09:56Z ALLOW(approved) :: journalctl --vacuum-size=500M

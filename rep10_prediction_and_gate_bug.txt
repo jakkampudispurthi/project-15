@@ -1,0 +1,32 @@
+REP 10 (part 1) — Predict before you measure: a real gate bug found
+
+Prediction (written before testing): I expected approval_gate.sh's
+existing DESTRUCTIVE pattern to correctly block journalctl
+--vacuum-size=500M, since runbook_disk_pressure.yaml explicitly marks
+this exact command autonomy: approve, reversible: false.
+
+Measured result: WRONG. The original pattern
+  '(\brm\b.*-[rf]|systemctl (stop|disable)|kubectl delete|reboot|
+    shutdown|drop\s+table|dd\s+if=)'
+does not mention journalctl or resize-pvc anywhere. Testing it
+directly showed:
+  ALLOW(read-only) :: journalctl --vacuum-size=500M
+The gate silently let through, unattended, the exact remediation the
+whole incident narrative (node-7 vs. node-4) is built around -- the
+one action that deletes real, unrecoverable log data. This is a real
+disagreement between two documents that are supposed to describe the
+same policy: the runbook's autonomy field said "approve," but the
+gate's actual pattern-matching code never enforced it.
+
+Fix applied: added journalctl.*--vacuum and resize-pvc to the
+DESTRUCTIVE pattern. Re-tested and confirmed:
+  BLOCK(needs-human) :: journalctl --vacuum-size=500M
+Now correctly blocks, matching the runbook's stated tier.
+
+This is exactly the gap this whole assignment is designed to surface.
+A runbook that SAYS an action requires approval is not the same thing
+as a gate that actually ENFORCES that approval -- the two have to be
+kept in sync by a human, and nothing catches a drift between them
+automatically unless someone tests the actual gate against the actual
+runbook, which is precisely what the "predict before you measure" step
+made me do here.
