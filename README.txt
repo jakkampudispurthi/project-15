@@ -1,4 +1,4 @@
-README.txt — Week 15: AIOps and Autonomous Operations
+README.txt 
 
 WHAT THIS IS
 A gated self-healing loop for a simulated disk-pressure incident: an
